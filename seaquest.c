@@ -65,7 +65,7 @@ typedef struct Diver {
 
 /* Frequencia de atualizacao do jogo, em quadros por segundo.
  * As velocidades das estruturas sao medidas em pixels por quadro. */
-const float FPS = 100;
+const float FPS = 60;
 
 /* Dimensoes da janela, tamanho do submarino e velocidades previstas.
  * Na versao inicial, initSub utiliza SUB_VEL_ABOVE; SUB_VEL_SEA ainda
@@ -195,6 +195,37 @@ void drawSub(Sub sub) {
 }
 
 /**
+ * @brief Retorna 1 se a posição y estiver na superfície ou acima, e 0 caso contrário.
+ */
+int isAboveSea(float pos_y) {
+    return pos_y <= SEA_LEVEL;
+}
+
+/**
+ * @brief Atualiza a velocidade do submarino dependendo da sua profundidade.
+ */
+void updateSpeed(Sub *s) {
+    s->vel = isAboveSea(s->y) ? SUB_VEL_ABOVE : SUB_VEL_SEA;
+}
+
+/**
+ * @brief Restringe a posição do submarino aos limites da tela.
+ */
+void screenLimit(Sub *s) {
+    if (s->x < 0) {
+        s->x = 0;
+    } else if (s->x > SCREEN_W - SUB_WIDTH) {
+        s->x = SCREEN_W - SUB_WIDTH;
+    }
+
+    if (s->y < 0) {
+        s->y = 0;
+    } else if (s->y > SCREEN_H - SUB_HEIGHT) {
+        s->y = SCREEN_H - SUB_HEIGHT;
+    }
+}
+
+/**
  * @brief Atualiza a posicao do submarino de acordo com o teclado.
  * @param s Ponteiro para o submarino a ser atualizado.
  *
@@ -203,13 +234,15 @@ void drawSub(Sub sub) {
  * por profundidade e nao consome nem reabastece oxigenio.
  */
 void updateSub(Sub *s) {
-
-
+	// Aplica o deslocamento baseado na direção e velocidade atual
 	s->x += s->dir_x * s->vel;
-
 	s->y += s->dir_y * s->vel;
 
+	// Garante que o submarino não saia da tela
+	screenLimit(s);
 
+	// Atualiza a velocidade para o próximo quadro com base na nova posição
+	updateSpeed(s);
 }
 
 
@@ -238,8 +271,6 @@ void updateDiver(Diver *diver) {
 	diver->x += diver->vel;
 
 }
-
-
 
  
 /**

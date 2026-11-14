@@ -27,6 +27,7 @@
 #include <allegro5/allegro_primitives.h>
 #include <allegro5/allegro_image.h>
 #include <math.h>
+#include <time.h>
 
 
 /**
@@ -75,7 +76,7 @@ const int SCREEN_H = 540;
 const int SUB_HEIGHT = 20;
 const int SUB_WIDTH = 80;
 const int SUB_VEL_ABOVE = 5;
-const int SUB_VEL_SEA = 1;
+const int SUB_VEL_SEA = 2;
 
 /* Constantes reservadas para a implementacao dos objetos e do oxigenio.
  * O programa inicial cria somente um Diver, sem utilizar NUM_DIVERS. */
@@ -165,6 +166,10 @@ void printDiver(Diver d, int id) {
 	printf("\n(%d) %.1f %.1f %d %d %d", id, d.x, d.y, d.dir_x, d.vel, d.foe);
 }
 
+int randInt(int min, int max) {
+    return min + rand() % (max - min + 1);
+}
+
 /**
  * @brief Inicializa um unico objeto circular verde.
  * @param diver Ponteiro para o objeto a ser inicializado.
@@ -174,12 +179,20 @@ void printDiver(Diver d, int id) {
  * caracteristicas e nao distribui objetos por diferentes profundidades.
  */
 void initDiver(Diver *diver) {
-	diver->dir_x = 1;
-	diver->x = 0;
-	diver->y = SCREEN_H/2;
-	diver->vel = 1;
-	diver->foe = 0;
-	diver->color = al_map_rgb(0,255,0);
+	diver->dir_x = randInt(0, 1) ? 1 : -1;
+
+	if(diver->dir_x == 1) {
+		diver->x = -30;
+	} else {
+		diver->x = SCREEN_W + 30;
+	}
+
+	diver->y = (SEA_LEVEL + 20) + rand() % (SCREEN_H - SEA_LEVEL - 25);
+	diver->vel = randInt(1,5);
+
+	diver->foe = randInt(0,1);
+	
+	diver->color = diver->foe ?  al_map_rgb(255,0,0) : al_map_rgb(255,255,255);
 }
 
 /**
@@ -234,14 +247,11 @@ void screenLimit(Sub *s) {
  * por profundidade e nao consome nem reabastece oxigenio.
  */
 void updateSub(Sub *s) {
-	// Aplica o deslocamento baseado na direção e velocidade atual
 	s->x += s->dir_x * s->vel;
 	s->y += s->dir_y * s->vel;
 
-	// Garante que o submarino não saia da tela
 	screenLimit(s);
 
-	// Atualiza a velocidade para o próximo quadro com base na nova posição
 	updateSpeed(s);
 }
 
@@ -254,9 +264,29 @@ void updateSub(Sub *s) {
  * DIVER_HEIGHT ainda nao sao utilizados no desenho.
  */
 void drawDiver(Diver diver) {
+	if (!diver.foe) {
+		al_draw_filled_circle(diver.x, diver.y, 10, diver.color);
+	} else {
+		al_draw_filled_rectangle(diver.x, 
+			diver.y - FOE_HEIGTH / 2, 
+            diver.x + FOE_WIDTH, 
+            diver.y + FOE_HEIGTH / 2, diver.color
+		);
+	}
 
-	al_draw_filled_circle(diver.x, diver.y, 10, diver.color);
+}
 
+/**
+ * @brief Verifica se o objeto ultrapassou completamente os limites laterais da tela.
+ * @return Retorna 1 se saiu da tela, e 0 caso contrário.
+ */
+int isObjectOutOfBounds(Diver *d) {
+    if (d->dir_x > 0 && d->x > SCREEN_W + 50) {
+        return 1;
+    } else if (d->dir_x < 0 && d->x < -50) {
+        return 1; 
+    }
+    return 0;
 }
 
 /**
@@ -267,9 +297,11 @@ void drawDiver(Diver diver) {
  * dir_x, nao testa os limites da tela e nao reposiciona o objeto.
  */
 void updateDiver(Diver *diver) {
+	diver->x += diver->dir_x * diver->vel;
 
-	diver->x += diver->vel;
-
+	if(isObjectOutOfBounds(diver)) {
+		initDiver(diver);
+	}
 }
 
  
@@ -291,9 +323,10 @@ void updateDiver(Diver *diver) {
  *         falhas de inicializacao.
  */
 int main(int argc, char **argv){
+	srand(time(NULL));
 
+	int i;
 
-	
 	ALLEGRO_DISPLAY *display = NULL;
 	ALLEGRO_EVENT_QUEUE *event_queue = NULL;
 	ALLEGRO_TIMER *timer = NULL;
@@ -377,10 +410,11 @@ int main(int argc, char **argv){
 	Sub sub;
 	initSub(&sub);
 
-	Diver diver;
-	initDiver(&diver);
-
-
+	Diver diver[NUM_DIVERS];
+	
+	for(i = 0; i < NUM_DIVERS; i++) {
+		initDiver(&diver[i]);
+	}
 
 	// Inicia a emissao de eventos periodicos pelo temporizador.
 	al_start_timer(timer);
@@ -398,13 +432,17 @@ int main(int argc, char **argv){
 
 
 			updateSub(&sub);
-			updateDiver(&diver);
-
+			
+			for(i = 0; i < NUM_DIVERS; i++) {
+				updateDiver(&diver[i]);
+			}
 
 
 
 			drawSub(sub);
-			drawDiver (diver);
+			for(i = 0; i < NUM_DIVERS; i++) {
+				drawDiver(diver[i]);
+			}
 
 
 			// Apresenta na janela o quadro que acabou de ser desenhado.

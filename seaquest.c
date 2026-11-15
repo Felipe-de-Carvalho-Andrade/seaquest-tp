@@ -1,24 +1,3 @@
-/**
- * @file seaquest_v0_documentado.c
- * @brief Versao inicial de um jogo inspirado em Seaquest, usando Allegro 5.
- *
- * Este arquivo e o ponto de partida do trabalho pratico de PDS-1.
- * O codigo fornecido ja cria a janela, trata as teclas W, A, S e D,
- * desenha um submarino e um objeto circular e atualiza suas posicoes.
- *
- * Nesta versao inicial, o submarino ainda pode sair dos limites da tela;
- * o objeto se move apenas para a direita, sem reaparecer ao sair da tela.
- * As mecanicas de resgate, inimigos, colisoes, oxigenio e recorde ainda
- * nao foram implementadas. A pontuacao comeca em zero e nao e alterada.
- *
- * O projeto utiliza Allegro 5.0.10 e requer o arquivo de fonte
- * "arial.ttf" no diretorio de execucao para desenhar textos.
- *
- * Os comentarios descrevem o comportamento efetivamente implementado.
- * As estruturas e constantes tambem incluem campos destinados a etapas
- * futuras do trabalho pratico.
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <allegro5/allegro.h>
@@ -68,9 +47,7 @@ typedef struct Diver {
  * As velocidades das estruturas sao medidas em pixels por quadro. */
 const float FPS = 60;
 
-/* Dimensoes da janela, tamanho do submarino e velocidades previstas.
- * Na versao inicial, initSub utiliza SUB_VEL_ABOVE; SUB_VEL_SEA ainda
- * nao e utilizado para alternar a velocidade ao mergulhar. */
+/* Dimensoes da janela, tamanho do submarino e velocidades previstas. */
 const int SCREEN_W = 960;
 const int SCREEN_H = 540;
 const int SUB_HEIGHT = 20;
@@ -78,8 +55,7 @@ const int SUB_WIDTH = 80;
 const int SUB_VEL_ABOVE = 5;
 const int SUB_VEL_SEA = 2;
 
-/* Constantes reservadas para a implementacao dos objetos e do oxigenio.
- * O programa inicial cria somente um Diver, sem utilizar NUM_DIVERS. */
+/* Constantes reservadas para a implementacao dos objetos e do oxigenio.*/
 #define NUM_DIVERS 12
 const int DIVER_WIDTH = 8;
 const int DIVER_HEIGHT = 3;
@@ -89,8 +65,7 @@ const int MAX_OXYGEN = 12;
 const int FOE_WIDTH = 32;
 const int FOE_HEIGTH = 14;
 
-/* Altura da faixa superior da tela e pontuacao corrente.
- * SCORE permanece em zero, pois ainda nao ha sistema de resgate. */
+/* Altura da faixa superior da tela e pontuacao corrente. */
 int SEA_LEVEL;
 int SCORE = 0;
 
@@ -166,6 +141,9 @@ void printDiver(Diver d, int id) {
 	printf("\n(%d) %.1f %.1f %d %d %d", id, d.x, d.y, d.dir_x, d.vel, d.foe);
 }
 
+/**
+ * @brief Gera um numero inteiro aleatorio entre um valor maximo e um valor minimo
+ */
 int randInt(int min, int max) {
     return min + rand() % (max - min + 1);
 }
@@ -186,8 +164,9 @@ void initDiver(Diver *diver) {
 	} else {
 		diver->x = SCREEN_W + 30;
 	}
-
-	diver->y = (SEA_LEVEL + 20) + rand() % (SCREEN_H - SEA_LEVEL - 25);
+	
+	// Surgimento dos objetos no mar com margem de seguranca superior e inferior
+	diver->y = (SEA_LEVEL + 20) + rand() % (SCREEN_H - SEA_LEVEL - 15);
 	diver->vel = randInt(1,5);
 
 	diver->foe = randInt(0,1);
@@ -278,7 +257,6 @@ void drawDiver(Diver diver) {
 
 /**
  * @brief Verifica se o objeto ultrapassou completamente os limites laterais da tela.
- * @return Retorna 1 se saiu da tela, e 0 caso contrário.
  */
 int isObjectOutOfBounds(Diver *d) {
     if (d->dir_x > 0 && d->x > SCREEN_W + 50) {
@@ -291,10 +269,6 @@ int isObjectOutOfBounds(Diver *d) {
 
 /**
  * @brief Desloca um unico objeto horizontalmente para a direita.
- * @param diver Ponteiro para o objeto cuja posicao sera atualizada.
- *
- * Acrescenta vel a coordenada x em cada quadro. Ainda nao considera
- * dir_x, nao testa os limites da tela e nao reposiciona o objeto.
  */
 void updateDiver(Diver *diver) {
 	diver->x += diver->dir_x * diver->vel;
@@ -302,6 +276,42 @@ void updateDiver(Diver *diver) {
 	if(isObjectOutOfBounds(diver)) {
 		initDiver(diver);
 	}
+}
+
+/**
+ * @brief Verifica se ocorreu colisao entre um submarino e um objeto
+ */
+int colisionDetected(Sub s, Diver d) {
+    // Limites do Submarino
+    float sub_left = s.x;
+    float sub_right = s.x + SUB_WIDTH;
+    float sub_top = s.y;
+    float sub_bottom = s.y + SUB_HEIGHT;
+
+	// Limites do Objeto
+    float obj_left, obj_right, obj_top, obj_bottom;
+
+    // Diferencia o objeto
+    if (d.foe) {
+        // Inimigo (Retângulo)
+        obj_left = d.x;
+        obj_right = d.x + FOE_WIDTH;
+        obj_top = d.y - FOE_HEIGTH / 2;
+        obj_bottom = d.y + FOE_HEIGTH / 2;
+    } else {
+        // Mergulhador (Círculo)
+        obj_left = d.x - 10;
+        obj_right = d.x + 10;
+        obj_top = d.y - 10;
+        obj_bottom = d.y + 10;
+    }
+
+    // Verificar se NÃO há colisão
+    if (sub_right < obj_left || sub_left > obj_right || sub_bottom < obj_top || sub_top > obj_bottom) {   
+        return 0; 
+    }
+
+    return 1;
 }
 
  
@@ -434,9 +444,21 @@ int main(int argc, char **argv){
 			updateSub(&sub);
 			
 			for(i = 0; i < NUM_DIVERS; i++) {
+				// Atualiza o objeto
 				updateDiver(&diver[i]);
+				
+				// Verifica se houve colisão com o submarino
+				if (colisionDetected(sub, diver[i])) {
+					if (diver[i].foe == 1) {
+						playing = 0;
+						break;
+					} 
+					else {
+						SCORE++;
+						initDiver(&diver[i]); // Reposiciona o mergulhador resgatado
+					}
+				}
 			}
-
 
 
 			drawSub(sub);
@@ -515,7 +537,7 @@ int main(int argc, char **argv){
 	sprintf(my_text, "Score: %d", SCORE);
 	al_draw_text(size_32, al_map_rgb(200, 0, 30), SCREEN_W/3, SCREEN_H/2, 0, my_text);
 
-
+	
 	
 	// Apresenta a tela final na janela.
 	al_flip_display();	

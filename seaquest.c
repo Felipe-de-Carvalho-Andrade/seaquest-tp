@@ -229,12 +229,12 @@ void screenLimit(Sub *s) {
  * por profundidade e nao consome nem reabastece oxigenio.
  */
 void updateSub(Sub *s) {
+	updateSpeed(s);
+	
 	s->x += s->dir_x * s->vel;
 	s->y += s->dir_y * s->vel;
 
 	screenLimit(s);
-
-	updateSpeed(s);
 }
 
 
@@ -550,28 +550,43 @@ int main(int argc, char **argv){
 
 	FILE *arq = fopen("record.txt", "r");
 	if (arq != NULL) {
-		fscanf(arq, "%d", &record);
+		if (fscanf(arq, "%d", &record) != 1) {
+			record = 0;
+		}
 		fclose(arq);
 	}
+
 	if (SCORE > record) {
 		bateu_record = 1;
 		record = SCORE;
-		arq = fopen("record.txt", "w");
+
+		FILE *arq = fopen("record.txt", "w");
 		if (arq == NULL) {
-			perror("ERRO! Falha ao salvar no arquivo");
+			perror("ERRO! Falha ao escrever no arquivo");
 		} else {
 			fprintf(arq, "%d", record);
 			fclose(arq);
 		}
 	}
 
-	char my_text[100]; 
-	al_clear_to_color(al_map_rgb(230,240,250));
-	bateu_record ? snprintf(my_text, sizeof(my_text), "NEW RECORD! Score: %d", SCORE) : snprintf(my_text, sizeof(my_text), "Score: %d", SCORE);
-	al_draw_text(size_32, al_map_rgb(200, 0, 30), SCREEN_W/3, SCREEN_H/2, 0, my_text);
+	char linha_principal[50];
+	char linha_secundaria[50];
+
+	al_clear_to_color(al_map_rgb(230, 240, 250));
+
+	if (bateu_record) {
+		snprintf(linha_principal, sizeof(linha_principal), "NEW RECORD!");
+		snprintf(linha_secundaria, sizeof(linha_secundaria), "Score: %d", SCORE);
+	} else {
+		snprintf(linha_principal, sizeof(linha_principal), "Score: %d", SCORE);
+		snprintf(linha_secundaria, sizeof(linha_secundaria), "Record: %d", record);
+	}
+
+	al_draw_text(size_32, al_map_rgb(200, 0, 30), SCREEN_W / 3, SCREEN_H / 2 - 25, 0, linha_principal);
+	al_draw_text(size_32, al_map_rgb(40, 40, 40), SCREEN_W / 3, SCREEN_H / 2 + 20, 0, linha_secundaria);
 
 	
-	
+
 	// Apresenta a tela final na janela.
 	al_flip_display();	
     al_rest(3);	

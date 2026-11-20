@@ -102,15 +102,29 @@ void initGlobalVars() {
  *       e o terminador '\0'; o codigo original usa sprintf sem limite.
  */
 void drawScenario(Sub sub) {
+    al_clear_to_color(SEA_COLOR);   
+    al_draw_filled_rectangle(0, 0, SCREEN_W, SEA_LEVEL, al_map_rgb(70, 70, 70)); 
 
-   al_clear_to_color(SEA_COLOR);   
-   
-   al_draw_filled_rectangle(0, 0, SCREEN_W, SEA_LEVEL, al_map_rgb(70,70,70)); 
+    char text_score[14];
+    sprintf(text_score, "%d", SCORE);
+    al_draw_text(size_32, al_map_rgb(0, 200, 0), 10, 10, 0, text_score);
 
-   char text_score[4];
-   sprintf(text_score, "%d", SCORE);
-   al_draw_text(size_32, al_map_rgb(0, 200, 0), 10, 10, 0, text_score);   
+    // Dimensoes da barra de oxigenio
+    float bar_x = 700.0f;
+    float bar_y = 18.0f;
+    float bar_w = 220.0f;
+    float bar_h = 22.0f;
 
+    float ratio = sub.oxygen / (float)MAX_OXYGEN;
+    
+	if (ratio < 0.0f) 
+		ratio = 0.0f;
+    if (ratio > 1.0f) 
+		ratio = 1.0f;
+
+    al_draw_filled_rectangle(bar_x, bar_y, bar_x + bar_w, bar_y + bar_h, al_map_rgb(30, 30, 30));
+    al_draw_filled_rectangle(bar_x, bar_y, bar_x + bar_w * ratio, bar_y + bar_h, al_map_rgb(0, 180, 255));
+    al_draw_rectangle(bar_x, bar_y, bar_x + bar_w, bar_y + bar_h, al_map_rgb(255, 255, 255), 1.25f);
 }
 
 /**
@@ -230,7 +244,7 @@ void screenLimit(Sub *s) {
  */
 void updateSub(Sub *s) {
 	updateSpeed(s);
-	
+
 	s->x += s->dir_x * s->vel;
 	s->y += s->dir_y * s->vel;
 
@@ -329,6 +343,21 @@ int colisionDetected(Sub s, Diver d) {
     }
 }
 
+/**
+ * @brief Atualiza o oxigenio do submarino conforme sua posicao em relacao a superficie.
+ */
+void updateOxygen(Sub *s) {
+    if (isAboveSea(s->y + 5)) {
+        // Reabastece completamente ao retornar a superficie
+        s->oxygen = MAX_OXYGEN;
+    } else {
+        // Consome oxigenio gradualmente enquanto submerso (FPS = 60 quadros/seg)
+        s->oxygen -= 1.0f / FPS;
+        if (s->oxygen < 0.0f) {
+            s->oxygen = 0.0f;
+        }
+    }
+}
  
 /**
  * @brief Inicializa a Allegro e executa o laco principal do jogo.
@@ -453,8 +482,12 @@ int main(int argc, char **argv){
 
 			drawScenario(sub);
 
-
 			updateSub(&sub);
+			updateOxygen(&sub);
+
+			if (sub.oxygen <= 0.0f) {
+				playing = 0;
+			}
 			
 			for(i = 0; i < NUM_DIVERS; i++) {
 				// Atualiza o objeto

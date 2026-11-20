@@ -538,7 +538,6 @@ int main(int argc, char **argv){
 				case ALLEGRO_KEY_D:
 					sub.dir_x--;
 				break;	
-				
 			}
 		}			
 
@@ -547,6 +546,7 @@ int main(int argc, char **argv){
 
 	// Secao responsavel pela manipulacao do arquivo
 	int record = 0;
+	int bateu_record = 0;
 
 	FILE *arq = fopen("record.txt", "r");
 	if (arq != NULL) {
@@ -554,6 +554,7 @@ int main(int argc, char **argv){
 		fclose(arq);
 	}
 	if (SCORE > record) {
+		bateu_record = 1;
 		record = SCORE;
 		arq = fopen("record.txt", "w");
 		if (arq == NULL) {
@@ -564,9 +565,9 @@ int main(int argc, char **argv){
 		}
 	}
 
-	char my_text[20]; 
+	char my_text[100]; 
 	al_clear_to_color(al_map_rgb(230,240,250));
-	sprintf(my_text, "Score: %d", SCORE);
+	bateu_record ? snprintf(my_text, sizeof(my_text), "NEW RECORD! Score: %d", SCORE) : snprintf(my_text, sizeof(my_text), "Score: %d", SCORE);
 	al_draw_text(size_32, al_map_rgb(200, 0, 30), SCREEN_W/3, SCREEN_H/2, 0, my_text);
 
 	

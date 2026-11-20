@@ -166,7 +166,10 @@ void initDiver(Diver *diver) {
 	}
 	
 	// Surgimento dos objetos no mar com margem de seguranca superior e inferior
-	diver->y = (SEA_LEVEL + 20) + rand() % (SCREEN_H - SEA_LEVEL - 15);
+	int min_y = SEA_LEVEL + 20;
+	int max_y = SCREEN_H - 15;
+
+	diver->y = randInt(min_y, max_y);
 	diver->vel = randInt(1,5);
 
 	diver->foe = randInt(0,1);
@@ -210,8 +213,8 @@ void screenLimit(Sub *s) {
         s->x = SCREEN_W - SUB_WIDTH;
     }
 
-    if (s->y < 0) {
-        s->y = 0;
+	if (s->y < SEA_LEVEL - SUB_HEIGHT) {
+        s->y = SEA_LEVEL - SUB_HEIGHT; // Impede o submarino de voar
     } else if (s->y > SCREEN_H - SUB_HEIGHT) {
         s->y = SCREEN_H - SUB_HEIGHT;
     }
@@ -288,30 +291,42 @@ int colisionDetected(Sub s, Diver d) {
     float sub_top = s.y;
     float sub_bottom = s.y + SUB_HEIGHT;
 
-	// Limites do Objeto
-    float obj_left, obj_right, obj_top, obj_bottom;
-
     // Diferencia o objeto
     if (d.foe) {
         // Inimigo (Retângulo)
-        obj_left = d.x;
-        obj_right = d.x + FOE_WIDTH;
-        obj_top = d.y - FOE_HEIGTH / 2;
-        obj_bottom = d.y + FOE_HEIGTH / 2;
+        float obj_left = d.x;
+        float obj_right = d.x + FOE_WIDTH;
+        float obj_top = d.y - FOE_HEIGTH / 2;
+        float obj_bottom = d.y + FOE_HEIGTH / 2;
+
+        // Verificar se NÃO há colisão
+        if (sub_right < obj_left || sub_left > obj_right || sub_bottom < obj_top || sub_top > obj_bottom) {   
+            return 0; 
+        }
+
+        return 1;
     } else {
         // Mergulhador (Círculo)
-        obj_left = d.x - 10;
-        obj_right = d.x + 10;
-        obj_top = d.y - 10;
-        obj_bottom = d.y + 10;
-    }
+        float radius = 10.0f;
+        float closest_x = d.x;
 
-    // Verificar se NÃO há colisão
-    if (sub_right < obj_left || sub_left > obj_right || sub_bottom < obj_top || sub_top > obj_bottom) {   
-        return 0; 
-    }
+        if (closest_x < sub_left) 
+			closest_x = sub_left;
+        else if (closest_x > sub_right) 
+			closest_x = sub_right;
 
-    return 1;
+        float closest_y = d.y;
+		
+        if (closest_y < sub_top) 
+			closest_y = sub_top;
+        else if (closest_y > sub_bottom) 
+			closest_y = sub_bottom;
+
+        float dx = d.x - closest_x;
+        float dy = d.y - closest_y;
+
+        return (dx * dx + dy * dy) <= (radius * radius);
+    }
 }
 
  
@@ -393,7 +408,7 @@ int main(int argc, char **argv){
 	}
 	
 	// Carrega novamente uma fonte local de tamanho 32 para uso na tela final.
-    ALLEGRO_FONT *size_32 = al_load_font("arial.ttf", 32, 1);   
+	initGlobalVars();
 	if(size_32 == NULL) {
 		fprintf(stderr, "font file does not exist or cannot be accessed!\n");
 	}
@@ -414,8 +429,6 @@ int main(int argc, char **argv){
 	al_register_event_source(event_queue, al_get_timer_event_source(timer));
 	// Registra eventos de pressionamento e liberacao de teclas.
 	al_register_event_source(event_queue, al_get_keyboard_event_source());
-
-	initGlobalVars();
 
 	Sub sub;
 	initSub(&sub);
@@ -469,6 +482,12 @@ int main(int argc, char **argv){
 
 			// Apresenta na janela o quadro que acabou de ser desenhado.
 			al_flip_display();
+
+			// Se o jogo terminou por colisao, mostra a situacao final por ~2 segundos.
+			if (!playing) {
+				// Aguarda brevemente, exibe a pontuacao e libera recursos.
+				al_rest(2);
+			}
 		}
 		// Fecha a partida caso a janela seja encerrada.
 		else if(ev.type == ALLEGRO_EVENT_DISPLAY_CLOSE) {
@@ -524,15 +543,28 @@ int main(int argc, char **argv){
 		}			
 
 	} // Fim do laco principal.
-     
-	// Aguarda brevemente, exibe a pontuacao e libera recursos.
-	
-	al_rest(2);
-	
-	
-	char my_text[20];	
-	int record; // Variavel reservada para o futuro sistema de recorde.
-	// Limpa a tela com uma cor clara para o resultado final.
+
+
+	// Secao responsavel pela manipulacao do arquivo
+	int record = 0;
+
+	FILE *arq = fopen("record.txt", "r");
+	if (arq != NULL) {
+		fscanf(arq, "%d", &record);
+		fclose(arq);
+	}
+	if (SCORE > record) {
+		record = SCORE;
+		arq = fopen("record.txt", "w");
+		if (arq == NULL) {
+			perror("ERRO! Falha ao salvar no arquivo");
+		} else {
+			fprintf(arq, "%d", record);
+			fclose(arq);
+		}
+	}
+
+	char my_text[20]; 
 	al_clear_to_color(al_map_rgb(230,240,250));
 	sprintf(my_text, "Score: %d", SCORE);
 	al_draw_text(size_32, al_map_rgb(200, 0, 30), SCREEN_W/3, SCREEN_H/2, 0, my_text);
@@ -544,6 +576,9 @@ int main(int argc, char **argv){
     al_rest(3);	
 	
  
+	if (size_32) {
+		al_destroy_font(size_32);
+	}
 	al_destroy_timer(timer);
 	al_destroy_display(display);
 	al_destroy_event_queue(event_queue);

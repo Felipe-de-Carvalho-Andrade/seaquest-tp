@@ -9,14 +9,6 @@
 #include <time.h>
 
 
-/**
- * @brief Dados do submarino controlado pelo jogador.
- *
- * As coordenadas (x, y) correspondem ao canto superior esquerdo do
- * submarino. dir_x e dir_y representam a direcao solicitada pelo teclado
- * (-1, 0 ou 1, normalmente). A velocidade e medida em pixels por quadro.
- * O campo oxygen e inicializado, mas ainda nao e atualizado no jogo.
- */
 typedef struct Sub {
 	float x, y;
 	int vel;	
@@ -26,14 +18,6 @@ typedef struct Sub {
 	ALLEGRO_COLOR color;
 } Sub;
 
-/**
- * @brief Dados de um objeto movel no oceano.
- *
- * O nome da estrutura e os campos dir_x e foe foram mantidos para
- * futuras etapas. No codigo atual, existe apenas um objeto, desenhado
- * como um circulo verde. O campo foe recebe zero e nao e consultado;
- * dir_x tambem nao e utilizado pela funcao de movimentacao atual.
- */
 typedef struct Diver {
 	float x,y;
 	int dir_x;
@@ -97,7 +81,6 @@ void initGlobalVars() {
  * @brief Desenha o fundo azul, a faixa superior cinza e a pontuacao.
  * @param sub Estado do submarino; parametro ainda nao utilizado aqui.
  *
- * @note Esta versao nao desenha a barra de oxigenio.
  * @note O vetor text_score comporta somente tres caracteres numericos
  *       e o terminador '\0'; o codigo original usa sprintf sem limite.
  */
@@ -144,17 +127,6 @@ void initSub(Sub *sub) {
 	sub->color = al_map_rgb(230, 230, 0);
 }
 
-
-/**
- * @brief Imprime os atributos de um objeto para depuracao.
- * @param d Objeto cujos dados serao exibidos.
- * @param id Identificador exibido na mensagem.
- * @note Funcao auxiliar disponivel, mas nao chamada no laco principal.
- */
-void printDiver(Diver d, int id) {
-	printf("\n(%d) %.1f %.1f %d %d %d", id, d.x, d.y, d.dir_x, d.vel, d.foe);
-}
-
 /**
  * @brief Gera um numero inteiro aleatorio entre um valor maximo e um valor minimo
  */
@@ -165,10 +137,6 @@ int randInt(int min, int max) {
 /**
  * @brief Inicializa um unico objeto circular verde.
  * @param diver Ponteiro para o objeto a ser inicializado.
- *
- * Define a posicao inicial em (0, SCREEN_H/2), velocidade 1,
- * dir_x igual a 1 e foe igual a 0. Nao cria um vetor, nao sorteia
- * caracteristicas e nao distribui objetos por diferentes profundidades.
  */
 void initDiver(Diver *diver) {
 	diver->dir_x = randInt(0, 1) ? 1 : -1;
@@ -237,10 +205,6 @@ void screenLimit(Sub *s) {
 /**
  * @brief Atualiza a posicao do submarino de acordo com o teclado.
  * @param s Ponteiro para o submarino a ser atualizado.
- *
- * A cada quadro, soma dir_x * vel a x e dir_y * vel a y.
- * Nesta versao, nao limita a posicao a tela, nao altera a velocidade
- * por profundidade e nao consome nem reabastece oxigenio.
  */
 void updateSub(Sub *s) {
 	updateSpeed(s);
@@ -358,6 +322,41 @@ void updateOxygen(Sub *s) {
         }
     }
 }
+
+void drawGame(Sub sub, Diver divers[]) {
+	drawScenario(sub);
+	drawSub(sub);
+			
+	for(int i = 0; i < NUM_DIVERS; i++) {
+		drawDiver(divers[i]);
+	}
+} 
+
+void updateGame(Sub *sub, Diver divers[], int *score, int *playing) {
+	updateSub(sub);
+	updateOxygen(sub);
+
+	if (sub->oxygen <= 0.0f) {
+		*playing = 0;
+	}
+	
+	for(int i = 0; i < NUM_DIVERS; i++) {
+		// Atualiza o objeto
+		updateDiver(&divers[i]);
+		
+		// Verifica se houve colisão com o submarino
+		if (colisionDetected(*sub, divers[i])) {
+			if (divers[i].foe == 1) {
+				*playing = 0;
+				break;
+			} 
+			else {
+				(*score)++;
+				initDiver(&divers[i]); // Reposiciona o mergulhador resgatado
+			}
+		}
+	}
+}
  
 /**
  * @brief Inicializa a Allegro e executa o laco principal do jogo.
@@ -368,8 +367,6 @@ void updateOxygen(Sub *s) {
  * As teclas W, A, S e D controlam a direcao; fechar a janela encerra
  * o laco. Ao terminar, apresenta uma tela com a pontuacao corrente.
  *
- * Nao ha verificacao de colisoes, oxigenio ou recorde. O unico evento
- * que encerra normalmente a partida e o fechamento da janela.
  *
  * @param argc Quantidade de argumentos de linha de comando (nao usada).
  * @param argv Vetor de argumentos de linha de comando (nao usado).
@@ -480,45 +477,14 @@ int main(int argc, char **argv){
 		// A cada evento do temporizador, atualiza e desenha um quadro.
 		if(ev.type == ALLEGRO_EVENT_TIMER) {
 
-			drawScenario(sub);
-
-			updateSub(&sub);
-			updateOxygen(&sub);
-
-			if (sub.oxygen <= 0.0f) {
-				playing = 0;
-			}
-			
-			for(i = 0; i < NUM_DIVERS; i++) {
-				// Atualiza o objeto
-				updateDiver(&diver[i]);
-				
-				// Verifica se houve colisão com o submarino
-				if (colisionDetected(sub, diver[i])) {
-					if (diver[i].foe == 1) {
-						playing = 0;
-						break;
-					} 
-					else {
-						SCORE++;
-						initDiver(&diver[i]); // Reposiciona o mergulhador resgatado
-					}
-				}
-			}
-
-
-			drawSub(sub);
-			for(i = 0; i < NUM_DIVERS; i++) {
-				drawDiver(diver[i]);
-			}
-
+			updateGame(&sub, diver, &SCORE, &playing);
+			drawGame(sub, diver);
 
 			// Apresenta na janela o quadro que acabou de ser desenhado.
 			al_flip_display();
 
-			// Se o jogo terminou por colisao, mostra a situacao final por ~2 segundos.
+			// Se o jogo terminou por colisao, mostra a situacao final por 2 segundos.
 			if (!playing) {
-				// Aguarda brevemente, exibe a pontuacao e libera recursos.
 				al_rest(2);
 			}
 		}

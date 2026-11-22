@@ -11,7 +11,7 @@
 
 typedef struct Sub {
 	float x, y;
-	int vel;	
+	float vel;	
 	int dir_x;
 	int dir_y;
 	float oxygen;
@@ -21,7 +21,7 @@ typedef struct Sub {
 typedef struct Diver {
 	float x,y;
 	int dir_x;
-	int vel;
+	float vel;
 	int foe; // Indicador reservado para diferenciar mergulhadores e inimigos.
 	ALLEGRO_COLOR color;
 } Diver;
@@ -36,14 +36,17 @@ const int SCREEN_W = 960;
 const int SCREEN_H = 540;
 const int SUB_HEIGHT = 20;
 const int SUB_WIDTH = 80;
-const int SUB_VEL_ABOVE = 5;
-const int SUB_VEL_SEA = 2;
+const float SUB_VEL_ABOVE = 5;
+const float SUB_VEL_SHALLOW = 2.7;
+const float SUB_VEL_SEA = 0.5;
 
 /* Constantes reservadas para a implementacao dos objetos e do oxigenio.*/
 #define NUM_DIVERS 12
 const int DIVER_WIDTH = 8;
 const int DIVER_HEIGHT = 3;
 const int MAX_OXYGEN = 12;
+const float OXYGEN_CONSUMPTION = 1.0;
+const float OXYGEN_RECHARGE = 2.0;
 
 /* Dimensoes previstas para inimigos; nao utilizadas nesta versao. */
 const int FOE_WIDTH = 32;
@@ -93,21 +96,16 @@ void drawScenario(Sub sub) {
     al_draw_text(size_32, al_map_rgb(0, 200, 0), 10, 10, 0, text_score);
 
     // Dimensoes da barra de oxigenio
-    float bar_x = 700.0f;
-    float bar_y = 18.0f;
-    float bar_w = 220.0f;
-    float bar_h = 22.0f;
+    float bar_x = 700.0;
+    float bar_y = 18.0;
+    float bar_w = 220.0;
+    float bar_h = 22.0;
 
-    float ratio = sub.oxygen / (float)MAX_OXYGEN;
-    
-	if (ratio < 0.0f) 
-		ratio = 0.0f;
-    if (ratio > 1.0f) 
-		ratio = 1.0f;
+    float ratio = sub.oxygen / MAX_OXYGEN;
 
     al_draw_filled_rectangle(bar_x, bar_y, bar_x + bar_w, bar_y + bar_h, al_map_rgb(30, 30, 30));
     al_draw_filled_rectangle(bar_x, bar_y, bar_x + bar_w * ratio, bar_y + bar_h, al_map_rgb(0, 180, 255));
-    al_draw_rectangle(bar_x, bar_y, bar_x + bar_w, bar_y + bar_h, al_map_rgb(255, 255, 255), 1.25f);
+    al_draw_rectangle(bar_x, bar_y, bar_x + bar_w, bar_y + bar_h, al_map_rgb(255, 255, 255), 1.25);
 }
 
 /**
@@ -182,9 +180,18 @@ int isAboveSea(float pos_y) {
  * @brief Atualiza a velocidade do submarino dependendo da sua profundidade.
  */
 void updateSpeed(Sub *s) {
-    s->vel = isAboveSea(s->y) ? SUB_VEL_ABOVE : SUB_VEL_SEA;
-}
+	// Calcula centro do submarino em y
+    float center_y = s->y + SUB_HEIGHT / 2.0f;
 
+    if (isAboveSea(center_y)) {
+        s->vel = SUB_VEL_ABOVE;
+        return;
+    }
+
+    float p = (center_y - SEA_LEVEL) / ((SCREEN_H - SUB_HEIGHT / 2.0f) - SEA_LEVEL);
+
+    s->vel = SUB_VEL_SHALLOW - p * (SUB_VEL_SHALLOW - SUB_VEL_SEA);
+}
 /**
  * @brief Restringe a posição do submarino aos limites da tela.
  */
@@ -285,7 +292,7 @@ int colisionDetected(Sub s, Diver d) {
         return 1;
     } else {
         // Mergulhador (Círculo)
-        float radius = 10.0f;
+        float radius = 10.0;
         float closest_x = d.x;
 
         if (closest_x < sub_left) 
@@ -311,14 +318,18 @@ int colisionDetected(Sub s, Diver d) {
  * @brief Atualiza o oxigenio do submarino conforme sua posicao em relacao a superficie.
  */
 void updateOxygen(Sub *s) {
-    if (isAboveSea(s->y + 5)) {
-        // Reabastece completamente ao retornar a superficie
-        s->oxygen = MAX_OXYGEN;
+    if (isAboveSea(s->y + (SUB_HEIGHT / 2))) {
+        // Reabastece oxigenio gradualmente enquanto estiver na superficie
+        s->oxygen += (OXYGEN_RECHARGE / FPS);
+
+		if(s->oxygen > MAX_OXYGEN)
+			s->oxygen = MAX_OXYGEN;
+ 
     } else {
-        // Consome oxigenio gradualmente enquanto submerso (FPS = 60 quadros/seg)
-        s->oxygen -= 1.0f / FPS;
-        if (s->oxygen < 0.0f) {
-            s->oxygen = 0.0f;
+        // Consome oxigenio gradualmente enquanto submerso
+        s->oxygen -= OXYGEN_CONSUMPTION / FPS;
+        if (s->oxygen < 0.0) {
+            s->oxygen = 0.0;
         }
     }
 }
@@ -336,7 +347,7 @@ void updateGame(Sub *sub, Diver divers[], int *score, int *playing) {
 	updateSub(sub);
 	updateOxygen(sub);
 
-	if (sub->oxygen <= 0.0f) {
+	if (sub->oxygen <= 0.0) {
 		*playing = 0;
 	}
 	

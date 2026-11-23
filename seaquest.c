@@ -15,6 +15,7 @@ typedef struct Sub {
 	int dir_x;
 	int dir_y;
 	float oxygen;
+	int invulnerability;
 	ALLEGRO_COLOR color;
 } Sub;
 
@@ -55,6 +56,7 @@ const int FOE_HEIGTH = 14;
 /* Altura da faixa superior da tela e pontuacao corrente. */
 int SEA_LEVEL;
 int SCORE = 0;
+int LIVES = 3;
 
 /* Recursos globais: cores e fonte para a interface.
  * SKY_COLOR e as distancias maximas de colisao estao reservadas
@@ -122,6 +124,7 @@ void initSub(Sub *sub) {
 	sub->dir_x = 0;
 	sub->dir_y = 0;
 	sub->oxygen = MAX_OXYGEN;
+	sub->invulnerability = 0;
 	sub->color = al_map_rgb(230, 230, 0);
 }
 
@@ -343,12 +346,16 @@ void drawGame(Sub sub, Diver divers[]) {
 	}
 } 
 
-void updateGame(Sub *sub, Diver divers[], int *score, int *playing) {
+void updateGame(Sub *sub, Diver divers[], int *score, int *playing, int *lives) {
 	updateSub(sub);
 	updateOxygen(sub);
 
-	if (sub->oxygen <= 0.0) {
+	if(sub->oxygen <= 0.0) {
 		*playing = 0;
+	}
+
+	if(sub->invulnerability > 0) {
+		sub->invulnerability--;
 	}
 	
 	for(int i = 0; i < NUM_DIVERS; i++) {
@@ -356,15 +363,21 @@ void updateGame(Sub *sub, Diver divers[], int *score, int *playing) {
 		updateDiver(&divers[i]);
 		
 		// Verifica se houve colisão com o submarino
-		if (colisionDetected(*sub, divers[i])) {
-			if (divers[i].foe == 1) {
-				*playing = 0;
-				break;
+		if(colisionDetected(*sub, divers[i])) {
+			if(divers[i].foe == 1 && sub->invulnerability <= 0) {
+				(*lives)--;
+				sub->invulnerability = 120;
+				initDiver(&divers[i]);
 			} 
-			else {
+			else if (divers[i].foe == 0) {
 				(*score)++;
 				initDiver(&divers[i]); // Reposiciona o mergulhador resgatado
 			}
+		}
+
+		if((*lives) == 0) {
+			*playing = 0;
+			break;
 		}
 	}
 }
@@ -488,7 +501,7 @@ int main(int argc, char **argv){
 		// A cada evento do temporizador, atualiza e desenha um quadro.
 		if(ev.type == ALLEGRO_EVENT_TIMER) {
 
-			updateGame(&sub, diver, &SCORE, &playing);
+			updateGame(&sub, diver, &SCORE, &playing, &LIVES);
 			drawGame(sub, diver);
 
 			// Apresenta na janela o quadro que acabou de ser desenhado.

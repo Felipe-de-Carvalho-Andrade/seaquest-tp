@@ -97,6 +97,11 @@ void drawScenario(Sub sub) {
     sprintf(text_score, "%d", SCORE);
     al_draw_text(size_32, al_map_rgb(0, 200, 0), 10, 10, 0, text_score);
 
+	char text_lives[14];
+	ALLEGRO_COLOR cor_vidas = (LIVES <= 1) ? al_map_rgb(255, 90, 90) : al_map_rgb(255, 255, 255);
+	snprintf(text_lives, sizeof(text_lives), "LIVES: %d", LIVES);
+	al_draw_text(size_32, cor_vidas, 380, 10, 0, text_lives);
+
     // Dimensoes da barra de oxigenio
     float bar_x = 700.0;
     float bar_y = 18.0;
